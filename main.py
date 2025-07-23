@@ -2,18 +2,58 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
+import itertools
+from argparse import ArgumentParser, Namespace
+import shutil
+import re
+
 
 OCCUPIED = -2
 FREE_FOR_WHOLE_WEEK = 10080
 
+ALLE_VERWENDUNGSTYPEN = ("ALLE_VERWENDUNGSTYPEN", 0)
+AUFZUG = ("AUFZUG", 4)
+BESPRECHUNGSRAUM = ("BESPRECHUNGSRAUM", 196)
+BIBLIOTHEK = ("BIBLIOTHEK", 10)
+FREIFLACHE = ("FREIFLACHE", 217)
+HORSAAL = ("HORSAAL", 20)
+PRAKTIKUMSRAUM_CHEMIE = ("PRAKTIKUMSRAUM_CHEMIE", 212)
+PRAKTIKUMSRAUM_EDV = ("PRAKTIKUMSRAUM_EDV", 213)
+PRAKTIKUMSRAUM_PHYSIK = ("PRAKTIKUMSRAUM_PHYSIK", 211)
+SEKRETARIAT = ("SEKRETARIAT", 40)
+SEMINARRAUM = ("SEMINARRAUM", 41)
+SPORTRAUM = ("SPORTRAUM", 128)
+SPRACHLABOR = ("SPRACHLABOR", 135)
+STUDENTENARBEITSRAUM = ("STUDENTENARBEITSRAUM", 208)
+TURNSAAL = ("TURNSAAL", 191)
+UBUNGSRAUM = ("UBUNGSRAUM", 131)
+UNTERRICHTSRAUM = ("UNTERRICHTSRAUM", 130)
+ZEICHENSAAL = ("ZEICHENSAAL", 55)
 
-def get_reservations(session: requests.Session) -> list[str]:
+ALL_USAGES: list[tuple[str, int]] = [AUFZUG, BESPRECHUNGSRAUM, BIBLIOTHEK, FREIFLACHE, HORSAAL, PRAKTIKUMSRAUM_CHEMIE, PRAKTIKUMSRAUM_EDV,
+                                     PRAKTIKUMSRAUM_PHYSIK, SEKRETARIAT, SEMINARRAUM, SPORTRAUM, SPRACHLABOR, STUDENTENARBEITSRAUM, TURNSAAL, UBUNGSRAUM, UNTERRICHTSRAUM, ZEICHENSAAL]
+
+CHEMIE = 36
+ELEKTROTECHNIK = 302
+GARCHING_SONST = 57
+MI = 33
+MW = 34
+PHYSIK = 35
+STAMM_NORD = 27
+STAMM_SUD = 26
+STAMM_SUDOST = 25
+STAMM_SUDWEST = 24
+STAMM_ZENTRAL = 23
+
+
+def get_reservations(session: requests.Session, search_text: str = "", building_category: int = 33, usage: int = 41) -> list[str]:
     index = 1
     data = {"pStart": index,
-            "pSuchbegriff": "",
-            "pGebaeudebereich": 33,
+            "pSuchbegriff": search_text,
+            "pGebaeudebereich": building_category,
             "pGebaeude": 0,
-            "pVerwendung": 41,
+            "pVerwendung": usage,
             "pVerwalter": 1}
 
     response = session.post(
@@ -74,35 +114,138 @@ def minutes_until_next_lecture(url) -> tuple[str, int]:
         return (lecture_name, FREE_FOR_WHOLE_WEEK)
 
 
-def main():
-    session = requests.session()
-    reservations = get_reservations(session)
-
-    all_rooms_info: list[tuple[str, int]] = []
+def work_thread(reservations: list[str]) -> list[tuple[str, int]]:
+    rooms_info: list[tuple[str, int]] = []
     for reservation in reservations:
         room_info = minutes_until_next_lecture(reservation)
-        all_rooms_info.append(room_info)
+        rooms_info.append(room_info)
 
-    all_rooms_info_sorted = sorted(
-        all_rooms_info, key=lambda x: x[1], reverse=True)
+    return rooms_info
 
-    for room_info in all_rooms_info_sorted:
+
+def fetch_multi_thread(reservations: list[str], max_workers: int = 4) -> list[tuple[str, int]]:
+    if len(reservations) == 0:
+        return [("No reservations found", 0)]
+    slice_size = len(reservations) // max_workers
+    extra = len(reservations) % max_workers
+    partitions: list[list[str]] = []
+    start = 0
+    for i in range(0, max_workers + 1):
+        end = start+slice_size
+        if extra < i:
+            end += 1
+        slice = reservations[start:end]
+        if i == max_workers:
+            slice.append(reservations[-1])
+        partitions.append(slice)
+        start = end
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        workers = executor.map(
+            lambda load: work_thread(load), partitions
+        )
+
+    all_rooms_info = list(itertools.chain.from_iterable(
+        result for result in workers))
+
+    return all_rooms_info
+
+
+def to_string(all_rooms_info: list[tuple[str, int]]) -> str:
+    string = ""
+    room_name_width = 58
+    state_col_width = 40
+    for room_info in all_rooms_info:
         room_name, time_left = room_info
-        room_name_width = 55
-        state_col_width = 10
+        room_ids = re.findall(r'\(([^)]*)\)', room_name)
+        if len(room_ids) != 0:
+            room_nav_link = urljoin("https://nav.tum.de/room/", room_ids[-1])
+        else:
+            room_nav_link = ""
+        string += f"{room_name:<{room_name_width}}"
         if time_left == OCCUPIED:
-            print(
-                f"{room_name:<{room_name_width}}{'State:':<{state_col_width}}Occupied")
+            string += f"{'State: Occupied':<{state_col_width}}"
         elif time_left == FREE_FOR_WHOLE_WEEK:
-            print(
-                f"{room_name:<{room_name_width}}{'State:':<{state_col_width}}Free for the entire week")
+            string += f"{'State: Free for the entire week':<{state_col_width}}"
         else:
             hours_left = time_left // 60
             minutes_left = time_left % 60
             time_str = f"Free for {hours_left} hours {minutes_left} minutes"
-            print(
-                f"{room_name:<{room_name_width}}{'State:':<{state_col_width}}{time_str}")
+            string += f"{f'State: {time_str}':<{state_col_width}}"
+        string += f"Link: {room_nav_link}\n"
+
+    return string
+
+
+def calculate(session: requests.Session, threads: int = 4, search_text: str = "", building_category: int = 33, usage: int = 41) -> str:
+    reservations = get_reservations(
+        session, search_text, building_category, usage)
+
+    all_rooms_info = fetch_multi_thread(reservations, threads)
+
+    all_rooms_info_sorted = sorted(
+        all_rooms_info, key=lambda x: x[1], reverse=True)
+
+    return to_string(all_rooms_info_sorted)
+
+
+def main(args: Namespace):
+    session = requests.session()
+    columns = shutil.get_terminal_size().columns
+    for name, usage in ALL_USAGES:
+        print("\033[1m", end="")
+        print("-"*columns)
+        print(name)
+        print("-"*columns)
+        print("\033[0m", end="")
+        for building in args.building:
+            print("\033[1m", end="")
+            print("\t\033[35m┌"+building)
+            print("\033[0m", end="")
+            if building == "Chemie":
+                output = calculate(
+                    session, 6, building_category=CHEMIE, usage=usage)
+            elif building == "Elektrotechnik":
+                output = calculate(
+                    session, 6, building_category=ELEKTROTECHNIK, usage=usage)
+            elif building == "Garching-Sonst":
+                output = calculate(
+                    session, 6, building_category=GARCHING_SONST, usage=usage)
+            elif building == "MI":
+                output = calculate(
+                    session, 6, building_category=MI, usage=usage)
+            elif building == "MW":
+                output = calculate(
+                    session, 6, building_category=MW, usage=usage)
+            elif building == "Physik":
+                output = calculate(
+                    session, 6, building_category=PHYSIK, usage=usage)
+            elif building == "Stamm-Sud":
+                output = calculate(
+                    session, 6, building_category=STAMM_SUD, usage=usage)
+            elif building == "Stamm-Nord":
+                output = calculate(
+                    session, 6, building_category=STAMM_NORD, usage=usage)
+            elif building == "Stamm-Sudost":
+                output = calculate(
+                    session, 6, building_category=STAMM_SUDOST, usage=usage)
+            elif building == "Stamm-Sudwest":
+                output = calculate(
+                    session, 6, building_category=STAMM_SUDWEST, usage=usage)
+            elif building == "Stamm-Zentral":
+                output = calculate(
+                    session, 6, building_category=STAMM_ZENTRAL, usage=usage)
+            else:
+                print("Please specify a building.")
+                continue
+            for line in output.splitlines():
+                print("\t\033[35m│\033[0m"+line)
+            print("\t\033[1m\033[35m└\033[0m")
 
 
 if __name__ == "__main__":
-    main()
+    argp = ArgumentParser()
+    argp.add_argument("--building", "-b", type=str, choices=["Chemie", "Elektrotechnik", "Garching-Sonst",
+                      "MI", "MW", "Physik", "Stamm-Sud", "Stamm-Nord", "Stamm-Sudost", "Stamm-Sudwest", "Stamm-Zentral"], required=True, action="append")
+    args = argp.parse_args()
+    main(args)
