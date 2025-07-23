@@ -11,27 +11,27 @@ import re
 OCCUPIED = -2
 FREE_FOR_WHOLE_WEEK = 10080
 
-ALLE_VERWENDUNGSTYPEN = ("ALLE_VERWENDUNGSTYPEN", 0)
-AUFZUG = ("AUFZUG", 4)
-BESPRECHUNGSRAUM = ("BESPRECHUNGSRAUM", 196)
-BIBLIOTHEK = ("BIBLIOTHEK", 10)
-FREIFLACHE = ("FREIFLACHE", 217)
-HORSAAL = ("HORSAAL", 20)
-PRAKTIKUMSRAUM_CHEMIE = ("PRAKTIKUMSRAUM_CHEMIE", 212)
-PRAKTIKUMSRAUM_EDV = ("PRAKTIKUMSRAUM_EDV", 213)
-PRAKTIKUMSRAUM_PHYSIK = ("PRAKTIKUMSRAUM_PHYSIK", 211)
-SEKRETARIAT = ("SEKRETARIAT", 40)
-SEMINARRAUM = ("SEMINARRAUM", 41)
-SPORTRAUM = ("SPORTRAUM", 128)
-SPRACHLABOR = ("SPRACHLABOR", 135)
-STUDENTENARBEITSRAUM = ("STUDENTENARBEITSRAUM", 208)
-TURNSAAL = ("TURNSAAL", 191)
-UBUNGSRAUM = ("UBUNGSRAUM", 131)
-UNTERRICHTSRAUM = ("UNTERRICHTSRAUM", 130)
-ZEICHENSAAL = ("ZEICHENSAAL", 55)
+ALLE_VERWENDUNGSTYPEN = {"Alle-Verwendungstypen": 0}
+AUFZUG = {"Aufzug": 4}
+BESPRECHUNGSRAUM = {"Besprechungsraum": 196}
+BIBLIOTHEK = {"Bibliothek": 10}
+FREIFLACHE = {"Freiflache": 217}
+HORSAAL = {"Horsaal": 20}
+PRAKTIKUMSRAUM_CHEMIE = {"Praktikumsraum-chemie": 212}
+PRAKTIKUMSRAUM_EDV = {"Praktikumsraum-edv": 213}
+PRAKTIKUMSRAUM_PHYSIK = {"Praktikumsraum-physik": 211}
+SEKRETARIAT = {"Sekretariat": 40}
+SEMINARRAUM = {"Seminarraum": 41}
+SPORTRAUM = {"Sportraum": 128}
+SPRACHLABOR = {"Sprachlabor": 135}
+STUDENTENARBEITSRAUM = {"Studentenarbeitsraum": 208}
+TURNSAAL = {"Turnsaal": 191}
+UBUNGSRAUM = {"Ubungsraum": 131}
+UNTERRICHTSRAUM = {"Unterrichtsraum": 130}
+ZEICHENSAAL = {"Zeichensaal": 55}
 
-ALL_USAGES: list[tuple[str, int]] = [AUFZUG, BESPRECHUNGSRAUM, BIBLIOTHEK, FREIFLACHE, HORSAAL, PRAKTIKUMSRAUM_CHEMIE, PRAKTIKUMSRAUM_EDV,
-                                     PRAKTIKUMSRAUM_PHYSIK, SEKRETARIAT, SEMINARRAUM, SPORTRAUM, SPRACHLABOR, STUDENTENARBEITSRAUM, TURNSAAL, UBUNGSRAUM, UNTERRICHTSRAUM, ZEICHENSAAL]
+ALL_USAGES: dict[str, int] = {**AUFZUG, **BESPRECHUNGSRAUM, **BIBLIOTHEK, **FREIFLACHE, **HORSAAL, **PRAKTIKUMSRAUM_CHEMIE, **PRAKTIKUMSRAUM_EDV,
+                              **PRAKTIKUMSRAUM_PHYSIK, **SEKRETARIAT, **SEMINARRAUM, **SPORTRAUM, **SPRACHLABOR, **STUDENTENARBEITSRAUM, **TURNSAAL, **UBUNGSRAUM, **UNTERRICHTSRAUM, **ZEICHENSAAL}
 
 CHEMIE = 36
 ELEKTROTECHNIK = 302
@@ -190,13 +190,14 @@ def calculate(session: requests.Session, threads: int = 4, search_text: str = ""
 
 def main(args: Namespace):
     session = requests.session()
-    for name, usage in ALL_USAGES:
+    for name in args.usage:
+        usage = ALL_USAGES.get(name)
         print("\033[1m\033[34m", end="")
         print("┌"+name)
         print("\033[0m", end="")
         for building in args.building:
             print("\033[1m", end="")
-            print("\t\033[35m┌"+building)
+            print("\033[34m│   \033[35m┌"+building)
             print("\033[0m", end="")
             if building == "Chemie":
                 output = calculate(
@@ -236,7 +237,7 @@ def main(args: Namespace):
                 continue
             for line in output.splitlines():
                 print("\033[34m│   \033[35m│\033[0m"+line)
-            print("\t\033[1m\033[35m└\033[0m")
+            print("\033[1m\033[34m│   \033[1m\033[35m└\033[0m")
 
         print("\033[1m\033[34m└\033[0m")
 
@@ -245,5 +246,7 @@ if __name__ == "__main__":
     argp = ArgumentParser()
     argp.add_argument("--building", "-b", type=str, choices=["Chemie", "Elektrotechnik", "Garching-Sonst",
                       "MI", "MW", "Physik", "Stamm-Sud", "Stamm-Nord", "Stamm-Sudost", "Stamm-Sudwest", "Stamm-Zentral"], required=True, action="append")
+    argp.add_argument("--usage", "-u", type=str, choices=["Alle-Verwendungstypen", "Aufzug", "Bibliothek",
+                      "Freiflache", "Horsaal", "Praktikumsraum-chemie", "Praktikumsraum-edv", "Praktikumsraum-physik", "Sekretariat", "Seminarraum", "Sportraum", "Sprachlabor", "Studentenarbeitsraum", "Turnsaal", "Ubungsraum", "Unterrichtsraum", "Zeichensaal"], required=True, action="append")
     args = argp.parse_args()
     main(args)
