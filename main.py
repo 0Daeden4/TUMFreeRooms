@@ -5,7 +5,6 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 import itertools
 from argparse import ArgumentParser, Namespace
-import shutil
 import re
 
 
@@ -191,12 +190,9 @@ def calculate(session: requests.Session, threads: int = 4, search_text: str = ""
 
 def main(args: Namespace):
     session = requests.session()
-    columns = shutil.get_terminal_size().columns
     for name, usage in ALL_USAGES:
-        print("\033[1m", end="")
-        print("-"*columns)
-        print(name)
-        print("-"*columns)
+        print("\033[1m\033[34m", end="")
+        print("┌"+name)
         print("\033[0m", end="")
         for building in args.building:
             print("\033[1m", end="")
@@ -239,8 +235,10 @@ def main(args: Namespace):
                 print("Please specify a building.")
                 continue
             for line in output.splitlines():
-                print("\t\033[35m│\033[0m"+line)
+                print("\033[34m│   \033[35m│\033[0m"+line)
             print("\t\033[1m\033[35m└\033[0m")
+
+        print("\033[1m\033[34m└\033[0m")
 
 
 if __name__ == "__main__":
