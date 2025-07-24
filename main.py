@@ -176,7 +176,9 @@ def to_string(all_rooms_info: list[tuple[str, int]]) -> str:
     return string
 
 
-def calculate(session: requests.Session, threads: int = 4, search_text: str = "", building_category: int = 33, usage: int = 41) -> str:
+def calculate(session: requests.Session, threads: int = 4, search_text: str = "", building_category: int = 33, usage: int | None = 41) -> str:
+    if not usage:
+        usage = 41
     reservations = get_reservations(
         session, search_text, building_category, usage)
 
@@ -190,6 +192,7 @@ def calculate(session: requests.Session, threads: int = 4, search_text: str = ""
 
 def main(args: Namespace):
     session = requests.session()
+    thread_count = args.threads
     for name in args.usage:
         usage = ALL_USAGES.get(name)
         print("\033[1m\033[34m", end="")
@@ -201,37 +204,37 @@ def main(args: Namespace):
             print("\033[0m", end="")
             if building == "Chemie":
                 output = calculate(
-                    session, 6, building_category=CHEMIE, usage=usage)
+                    session, thread_count, building_category=CHEMIE, usage=usage)
             elif building == "Elektrotechnik":
                 output = calculate(
-                    session, 6, building_category=ELEKTROTECHNIK, usage=usage)
+                    session, thread_count, building_category=ELEKTROTECHNIK, usage=usage)
             elif building == "Garching-Sonst":
                 output = calculate(
-                    session, 6, building_category=GARCHING_SONST, usage=usage)
+                    session, thread_count, building_category=GARCHING_SONST, usage=usage)
             elif building == "MI":
                 output = calculate(
-                    session, 6, building_category=MI, usage=usage)
+                    session, thread_count, building_category=MI, usage=usage)
             elif building == "MW":
                 output = calculate(
-                    session, 6, building_category=MW, usage=usage)
+                    session, thread_count, building_category=MW, usage=usage)
             elif building == "Physik":
                 output = calculate(
-                    session, 6, building_category=PHYSIK, usage=usage)
+                    session, thread_count, building_category=PHYSIK, usage=usage)
             elif building == "Stamm-Sud":
                 output = calculate(
-                    session, 6, building_category=STAMM_SUD, usage=usage)
+                    session, thread_count, building_category=STAMM_SUD, usage=usage)
             elif building == "Stamm-Nord":
                 output = calculate(
-                    session, 6, building_category=STAMM_NORD, usage=usage)
+                    session, thread_count, building_category=STAMM_NORD, usage=usage)
             elif building == "Stamm-Sudost":
                 output = calculate(
-                    session, 6, building_category=STAMM_SUDOST, usage=usage)
+                    session, thread_count, building_category=STAMM_SUDOST, usage=usage)
             elif building == "Stamm-Sudwest":
                 output = calculate(
-                    session, 6, building_category=STAMM_SUDWEST, usage=usage)
+                    session, thread_count, building_category=STAMM_SUDWEST, usage=usage)
             elif building == "Stamm-Zentral":
                 output = calculate(
-                    session, 6, building_category=STAMM_ZENTRAL, usage=usage)
+                    session, thread_count, building_category=STAMM_ZENTRAL, usage=usage)
             else:
                 print("Please specify a building.")
                 continue
@@ -248,5 +251,6 @@ if __name__ == "__main__":
                       "MI", "MW", "Physik", "Stamm-Sud", "Stamm-Nord", "Stamm-Sudost", "Stamm-Sudwest", "Stamm-Zentral"], required=True, action="append")
     argp.add_argument("--usage", "-u", type=str, choices=["Alle-Verwendungstypen", "Aufzug", "Bibliothek",
                       "Freiflache", "Horsaal", "Praktikumsraum-chemie", "Praktikumsraum-edv", "Praktikumsraum-physik", "Sekretariat", "Seminarraum", "Sportraum", "Sprachlabor", "Studentenarbeitsraum", "Turnsaal", "Ubungsraum", "Unterrichtsraum", "Zeichensaal"], required=True, action="append")
+    argp.add_argument("-threads", "-t", type=int, required=False, default=4)
     args = argp.parse_args()
     main(args)
