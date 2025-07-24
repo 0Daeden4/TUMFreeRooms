@@ -10,3 +10,7 @@
 
 - Fetches information from https://campus.tum.de/tumonline/wbSuche.raumSuche and iterates through all of the returned rooms in a multi threaded(!) manner
 - Displays how many hours and minutes are left until a room is occupied by some event in a pretty way
+
+# Disclaimer
+
+- The code contains some AI generated content for trivial stuff
