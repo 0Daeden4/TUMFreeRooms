@@ -30,7 +30,7 @@ UBUNGSRAUM = {"Ubungsraum": 131}
 UNTERRICHTSRAUM = {"Unterrichtsraum": 130}
 ZEICHENSAAL = {"Zeichensaal": 55}
 
-ALL_USAGES: dict[str, int] = {**AUFZUG, **BESPRECHUNGSRAUM, **BIBLIOTHEK, **FREIFLACHE, **HORSAAL, **PRAKTIKUMSRAUM_CHEMIE, **PRAKTIKUMSRAUM_EDV,
+ALL_USAGES: dict[str, int] = {**ALLE_VERWENDUNGSTYPEN, **AUFZUG, **BESPRECHUNGSRAUM, **BIBLIOTHEK, **FREIFLACHE, **HORSAAL, **PRAKTIKUMSRAUM_CHEMIE, **PRAKTIKUMSRAUM_EDV,
                               **PRAKTIKUMSRAUM_PHYSIK, **SEKRETARIAT, **SEMINARRAUM, **SPORTRAUM, **SPRACHLABOR, **STUDENTENARBEITSRAUM, **TURNSAAL, **UBUNGSRAUM, **UNTERRICHTSRAUM, **ZEICHENSAAL}
 
 CHEMIE = 36
@@ -177,7 +177,7 @@ def to_string(all_rooms_info: list[tuple[str, int]]) -> str:
 
 
 def calculate(session: requests.Session, threads: int = 4, search_text: str = "", building_category: int = 33, usage: int | None = 41) -> str:
-    if not usage:
+    if usage is None:
         usage = 41
     reservations = get_reservations(
         session, search_text, building_category, usage)
