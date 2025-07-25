@@ -283,7 +283,7 @@ if __name__ == "__main__":
                             " With '*something*' you get 'Something', 'StuffSomething' and 'SomethingStuff'." +
                             " With 'Something%%' you get 'SomethingStuff'." +
                             " With 'S_mething' you get 'Something' and 'Samething'." +
-                            "Example: '*01.0*. *01.1*.' searches the rooms on the first floor etc."
+                            "Example: '*01.0*) *01.1*)' searches the rooms on the first floor etc."
                             )
                       )
     args = argp.parse_args()
