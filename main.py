@@ -123,21 +123,26 @@ def work_thread(reservations: list[str]) -> list[tuple[str, int]]:
 
 
 def fetch_multi_thread(reservations: list[str], max_workers: int = 4) -> list[tuple[str, int]]:
-    if len(reservations) == 0:
+    reservations_length = len(reservations)
+    if reservations_length == 0:
         return [("No reservations found", 0)]
-    slice_size = len(reservations) // max_workers
-    extra = len(reservations) % max_workers
+    slice_size = reservations_length // max_workers
+    extra = reservations_length % max_workers
     partitions: list[list[str]] = []
     start = 0
-    for i in range(0, max_workers + 1):
-        end = start+slice_size
-        if extra < i:
-            end += 1
-        slice = reservations[start:end]
-        if i == max_workers:
-            slice.append(reservations[-1])
-        partitions.append(slice)
-        start = end
+    if max_workers >= reservations_length:
+        partitions = [[elem] for elem in reservations]
+        max_workers = reservations_length
+    else:
+        for i in range(0, max_workers):
+            end = start+slice_size
+            if i < extra:
+                end += 1
+            slice = reservations[start:end]
+            if i == max_workers:
+                slice.append(reservations[-1])
+            partitions.append(slice)
+            start = end
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         workers = executor.map(
@@ -176,7 +181,9 @@ def to_string(all_rooms_info: list[tuple[str, int]]) -> str:
     return string
 
 
-def calculate(session: requests.Session, threads: int = 4, search_text: str = "", building_category: int = 33, usage: int | None = 41) -> str:
+def calculate(session: requests.Session, threads: int = 4, search_text: str | None = "", building_category: int = 33, usage: int | None = 41) -> str:
+    if search_text is None:
+        search_text = ""
     if usage is None:
         usage = 41
     reservations = get_reservations(
@@ -193,6 +200,17 @@ def calculate(session: requests.Session, threads: int = 4, search_text: str = ""
 def main(args: Namespace):
     session = requests.session()
     thread_count = args.threads
+
+    if args.search:
+        search_text = args.search
+        stripped = search_text.replace(
+            "*", "").replace("%", "").replace("_", "")
+        if len(stripped) < 3:
+            raise ValueError(
+                "Length of the search text must be greater or equal to 3 characters excluding the wildcards.")
+    else:
+        search_text = ""
+
     for name in args.usage:
         usage = ALL_USAGES.get(name)
         print("\033[1m\033[34m", end="")
@@ -204,37 +222,37 @@ def main(args: Namespace):
             print("\033[0m", end="")
             if building == "Chemie":
                 output = calculate(
-                    session, thread_count, building_category=CHEMIE, usage=usage)
+                    session, thread_count, building_category=CHEMIE, usage=usage, search_text=search_text)
             elif building == "Elektrotechnik":
                 output = calculate(
-                    session, thread_count, building_category=ELEKTROTECHNIK, usage=usage)
+                    session, thread_count, building_category=ELEKTROTECHNIK, usage=usage, search_text=search_text)
             elif building == "Garching-Sonst":
                 output = calculate(
-                    session, thread_count, building_category=GARCHING_SONST, usage=usage)
+                    session, thread_count, building_category=GARCHING_SONST, usage=usage, search_text=search_text)
             elif building == "MI":
                 output = calculate(
-                    session, thread_count, building_category=MI, usage=usage)
+                    session, thread_count, building_category=MI, usage=usage, search_text=search_text)
             elif building == "MW":
                 output = calculate(
-                    session, thread_count, building_category=MW, usage=usage)
+                    session, thread_count, building_category=MW, usage=usage, search_text=search_text)
             elif building == "Physik":
                 output = calculate(
-                    session, thread_count, building_category=PHYSIK, usage=usage)
+                    session, thread_count, building_category=PHYSIK, usage=usage, search_text=search_text)
             elif building == "Stamm-Sud":
                 output = calculate(
-                    session, thread_count, building_category=STAMM_SUD, usage=usage)
+                    session, thread_count, building_category=STAMM_SUD, usage=usage, search_text=search_text)
             elif building == "Stamm-Nord":
                 output = calculate(
-                    session, thread_count, building_category=STAMM_NORD, usage=usage)
+                    session, thread_count, building_category=STAMM_NORD, usage=usage, search_text=search_text)
             elif building == "Stamm-Sudost":
                 output = calculate(
-                    session, thread_count, building_category=STAMM_SUDOST, usage=usage)
+                    session, thread_count, building_category=STAMM_SUDOST, usage=usage, search_text=search_text)
             elif building == "Stamm-Sudwest":
                 output = calculate(
-                    session, thread_count, building_category=STAMM_SUDWEST, usage=usage)
+                    session, thread_count, building_category=STAMM_SUDWEST, usage=usage, search_text=search_text)
             elif building == "Stamm-Zentral":
                 output = calculate(
-                    session, thread_count, building_category=STAMM_ZENTRAL, usage=usage)
+                    session, thread_count, building_category=STAMM_ZENTRAL, usage=usage, search_text=search_text)
             else:
                 print("Please specify a building.")
                 continue
@@ -252,5 +270,13 @@ if __name__ == "__main__":
     argp.add_argument("--usage", "-u", type=str, choices=["Alle-Verwendungstypen", "Aufzug", "Bibliothek",
                       "Freiflache", "Horsaal", "Praktikumsraum-chemie", "Praktikumsraum-edv", "Praktikumsraum-physik", "Sekretariat", "Seminarraum", "Sportraum", "Sprachlabor", "Studentenarbeitsraum", "Turnsaal", "Ubungsraum", "Unterrichtsraum", "Zeichensaal"], required=True, action="append")
     argp.add_argument("-threads", "-t", type=int, required=False, default=4)
+    argp.add_argument("-search", "-s", type=str, required=False,
+                      help=("Has to be longer than 3 characters excluding the wildcards." +
+                            "Accepts wildcards such as (*, _ and %%)." +
+                            " With 'something' you get 'Something'." +
+                            " With '*something*' you get 'Something', 'StuffSomething' and 'SomethingStuff'." +
+                            " With 'Something%%' you get 'SomethingStuff'." +
+                            " With 'S_mething' you get 'Something' and 'Samething'.")
+                      )
     args = argp.parse_args()
     main(args)
