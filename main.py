@@ -205,10 +205,15 @@ def main(args: Namespace):
         search_text = args.search
         forbidden = "|-()²³\"&*#=§%/{}[]'´+?~_:.,;!^°<>$"
         escaped = re.escape(forbidden)
-        pattern = rf"(?:[^{escaped}]){{3,}}"
-        if not bool(re.search(pattern, search_text)):
+        pattern = rf"[^{escaped}]"
+        pattern_2 = r"[^*%]{2,}"
+
+        if len(re.findall(pattern, search_text)) < 3:
             raise ValueError(
                 r"""You must include at least three characters other than '|-()²³"&*#=§%/{}[]''´+?~_:.,;!^°<>$' in your search text!""")
+        elif not re.search(pattern_2, search_text):
+            raise ValueError(
+                "You must use at least two consecutive characters that are not '*' or '%'.")
     else:
         search_text = ""
 
@@ -277,7 +282,9 @@ if __name__ == "__main__":
                             " With 'something' you get 'Something'." +
                             " With '*something*' you get 'Something', 'StuffSomething' and 'SomethingStuff'." +
                             " With 'Something%%' you get 'SomethingStuff'." +
-                            " With 'S_mething' you get 'Something' and 'Samething'.")
+                            " With 'S_mething' you get 'Something' and 'Samething'." +
+                            "Example: '*01.0*. *01.1*.' searches the rooms on the first floor etc."
+                            )
                       )
     args = argp.parse_args()
     main(args)
