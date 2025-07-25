@@ -203,11 +203,12 @@ def main(args: Namespace):
 
     if args.search:
         search_text = args.search
-        stripped = search_text.replace(
-            "*", "").replace("%", "").replace("_", "")
-        if len(stripped) < 3:
+        forbidden = "|-()²³\"&*#=§%/{}[]'´+?~_:.,;!^°<>$"
+        escaped = re.escape(forbidden)
+        pattern = rf"(?:[^{escaped}]){{3,}}"
+        if not bool(re.search(pattern, search_text)):
             raise ValueError(
-                "Length of the search text must be greater or equal to 3 characters excluding the wildcards.")
+                r"""You must include at least three characters other than '|-()²³"&*#=§%/{}[]''´+?~_:.,;!^°<>$' in your search text!""")
     else:
         search_text = ""
 
@@ -271,7 +272,7 @@ if __name__ == "__main__":
                       "Freiflache", "Horsaal", "Praktikumsraum-chemie", "Praktikumsraum-edv", "Praktikumsraum-physik", "Sekretariat", "Seminarraum", "Sportraum", "Sprachlabor", "Studentenarbeitsraum", "Turnsaal", "Ubungsraum", "Unterrichtsraum", "Zeichensaal"], required=True, action="append")
     argp.add_argument("-threads", "-t", type=int, required=False, default=4)
     argp.add_argument("-search", "-s", type=str, required=False,
-                      help=("Has to be longer than 3 characters excluding the wildcards." +
+                      help=(r"""You must include at least three characters other than '|-()²³"&*#=§%%/{}[]''´+?~_:.,;!^°<>$' in your search text!""" +
                             "Accepts wildcards such as (*, _ and %%)." +
                             " With 'something' you get 'Something'." +
                             " With '*something*' you get 'Something', 'StuffSomething' and 'SomethingStuff'." +
